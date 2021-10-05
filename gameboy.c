@@ -78,14 +78,13 @@ void handleBanking(GameBoy* gameBoy, uint16_t address, uint8_t value) {
 }
 
 uint8_t readFromMemory(GameBoy* gameBoy, uint16_t address) {
-    /*
     if((address >= 0x4000) && (address <= 0x7fff)) {
         uint16_t newAddress = address - 0x4000;
-        return gameBoy->cartridge[newAddress + (gameBoy->currentROMBank * 0x4000)];
+        return gameBoy->cartridge[newAddress + ((gameBoy->currentROMBank - 1) * 0x4000)];
     } else if((address >= 0xa000) && (address <= 0xbfff)) {
         uint16_t newAddress = address - 0xa000;
         return gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)];
-    } else */if((address >= 0xfea0) && (address < 0xfeff)) {
+    } else if((address >= 0xfea0) && (address <= 0xff00)) {
         return 0xff;
     } else if(address == 0xffff) {
         return gameBoy->cpu.interruptsEnabled;
@@ -94,7 +93,6 @@ uint8_t readFromMemory(GameBoy* gameBoy, uint16_t address) {
 }
 
 void writeToMemory(GameBoy* gameBoy, uint16_t address, uint8_t value) {
-    /*
     if(address < 0x8000) {
         handleBanking(gameBoy, address, value);
     } else if((address >= 0xa000) && (address < 0xc000)) {
@@ -102,7 +100,8 @@ void writeToMemory(GameBoy* gameBoy, uint16_t address, uint8_t value) {
             uint16_t newAddress = address - 0xa000;
             gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)] = value;
         }
-    } else */if((address >= 0xfea0) && (address < 0xfeff)) {
+    } else if((address >= 0xfea0) && (address <= 0xff00)) {
+        // RESTRICTED
     } else if((address >= 0xc000) && (address < 0xe000)) {
         gameBoy->rom[address] = value;
         gameBoy->rom[address + 0x2000] = value;
@@ -182,11 +181,10 @@ void serviceInterrupt(GameBoy* gameBoy, int interrupt) {
     push(gameBoy, (uint8_t) gameBoy->cpu.pc, (uint8_t) (gameBoy->cpu.pc >> 8));
 
     switch(interrupt) {
-        case 0: gameBoy->cpu.pc = 0x0040; break;
-        case 1: gameBoy->cpu.pc = 0x0048; break;
-        case 2: gameBoy->cpu.pc = 0x0050; break;
-        case 3: gameBoy->cpu.pc = 0x0058; break;
-        case 4: gameBoy->cpu.pc = 0x0060; break;
+        case 0: gameBoy->cpu.pc = 0x40; break;
+        case 1: gameBoy->cpu.pc = 0x48; break;
+        case 2: gameBoy->cpu.pc = 0x50; break;
+        case 4: gameBoy->cpu.pc = 0x60; break;
     }
 }
 
@@ -199,7 +197,7 @@ int doInterrupts(GameBoy* gameBoy) {
         uint8_t enabled = readFromMemory(gameBoy, 0xffff);
         if(req > 0)
             for(int i = 0; i < 5; i++)
-                if(bit_value(req, i))
+                if(bit_value(req, i) == true)
                     if(bit_value(enabled, i)) {
                         serviceInterrupt(gameBoy, i);
                         return 20;
@@ -296,87 +294,6 @@ void drawScanline(GameBoy* gameBoy) {
         renderSprites(gameBoy);
 }
 
-void renderSprites(GameBoy* gameBoy) {
-    bool use8x16 = false;
-    uint8_t lcdControl = readFromMemory(gameBoy, 0xff40);
-    if(bit_value(lcdControl, 2))
-        use8x16 = true;
-    for(int sprite = 0; sprite < 40; sprite++) {
-        uint8_t index = sprite * 4;
-        uint8_t yPos = readFromMemory(gameBoy, 0xfe00 + index) - 16;
-        uint8_t xPos = readFromMemory(gameBoy, 0xfe00 + index + 1) - 8;
-        uint8_t tileLocation = readFromMemory(gameBoy, 0xfe00 + index + 2);
-        uint8_t attributes = readFromMemory(gameBoy, 0xfe00 + index + 3);
-
-        bool yFlip = bit_value(attributes, 6);
-        bool xFlip = bit_value(attributes, 5);
-        //bool priority = !bit_value(attributes, 7);
-        int scanline = readFromMemory(gameBoy, 0xff44);
-
-        int ySize = use8x16 ? 16 : 8;
-        /*
-        if(use8x16)
-            ySize = 16;
-        */
-        if((scanline >= yPos) && (scanline < (yPos + ySize))) {
-            int line = scanline - yPos;
-
-            if(yFlip) {
-                line -= ySize;
-                line *= -1;
-            }
-
-            line *= 2;
-            uint16_t dataAddress = (0x8000 + (tileLocation * 16)) + line;
-            uint8_t data1 = readFromMemory(gameBoy, dataAddress);
-            uint8_t data2 = readFromMemory(gameBoy, dataAddress + 1);
-
-            for(int tilePixel = 7; tilePixel >= 0; tilePixel--) {
-                int colorBit = tilePixel;
-                if(xFlip) {
-                    colorBit -= 7;
-                    colorBit *= -1;
-                }
-                int colorNum = check_bit(data2, colorBit);
-                colorNum <<= 1;
-                colorNum |= check_bit(data1, colorBit);
-
-                uint16_t colorAddress = bit_value(attributes, 4) ? 0xff49 : 0xff48;
-                Color col = getColor(gameBoy, colorAddress, colorNum);
-
-                if(col == WHITE)
-                    continue;
-                
-                int red = 0;
-                int green = 0;
-                int blue = 0;
-
-                switch(col) {
-                    case WHITE: red = 255; green = 255; blue = 255; break;
-                    case LIGHT_GRAY: red = 0xcc; green = 0xcc; blue = 0xcc; break;
-                    case DARK_GRAY: red = 0x77; green = 0x77; blue = 0x77; break;
-                }
-
-                int xPix = 0 - tilePixel;
-                xPix += 7;
-
-                int pixel = xPos + xPix;
-                if((scanline < 0) || (scanline > 143) || (pixel < 0) || (pixel > 159))
-                    continue;
-
-                /*
-                if(!priority)
-                    continue;
-                */
-
-                gameBoy->screenData[pixel][scanline][0] = red;
-                gameBoy->screenData[pixel][scanline][1] = green;
-                gameBoy->screenData[pixel][scanline][2] = blue;
-            }
-        }
-    }
-}
-
 void renderTiles(GameBoy* gameBoy) {
     uint16_t tileData = 0;
     uint16_t backgroundMemory = 0;
@@ -471,6 +388,87 @@ void renderTiles(GameBoy* gameBoy) {
     }
 }
 
+void renderSprites(GameBoy* gameBoy) {
+    bool use8x16 = false;
+    uint8_t lcdControl = readFromMemory(gameBoy, 0xff40);
+    if(bit_value(lcdControl, 2))
+        use8x16 = true;
+    for(int sprite = 0; sprite < 40; sprite++) {
+        uint8_t index = sprite * 4;
+        uint8_t yPos = readFromMemory(gameBoy, 0xfe00 + index) - 16;
+        uint8_t xPos = readFromMemory(gameBoy, 0xfe00 + index + 1) - 8;
+        uint8_t tileLocation = readFromMemory(gameBoy, 0xfe00 + index + 2);
+        uint8_t attributes = readFromMemory(gameBoy, 0xfe00 + index + 3);
+
+        bool yFlip = bit_value(attributes, 6);
+        bool xFlip = bit_value(attributes, 5);
+        //bool priority = !bit_value(attributes, 7);
+        int scanline = readFromMemory(gameBoy, 0xff44);
+
+        int ySize = use8x16 ? 16 : 8;
+        /*
+        if(use8x16)
+            ySize = 16;
+        */
+        if((scanline >= yPos) && (scanline < (yPos + ySize))) {
+            int line = scanline - yPos;
+
+            if(yFlip) {
+                line -= ySize;
+                line *= -1;
+            }
+
+            line *= 2;
+            uint16_t dataAddress = (0x8000 + (tileLocation * 16)) + line;
+            uint8_t data1 = readFromMemory(gameBoy, dataAddress);
+            uint8_t data2 = readFromMemory(gameBoy, dataAddress + 1);
+
+            for(int tilePixel = 7; tilePixel >= 0; tilePixel--) {
+                int colorBit = tilePixel;
+                if(xFlip) {
+                    colorBit -= 7;
+                    colorBit *= -1;
+                }
+                int colorNum = check_bit(data2, colorBit);
+                colorNum <<= 1;
+                colorNum |= check_bit(data1, colorBit);
+
+                uint16_t colorAddress = bit_value(attributes, 4) ? 0xff49 : 0xff48;
+                Color col = getColor(gameBoy, colorAddress, colorNum);
+
+                if(col == WHITE)
+                    continue;
+                
+                int red = 0;
+                int green = 0;
+                int blue = 0;
+
+                switch(col) {
+                    case WHITE: red = 255; green = 255; blue = 255; break;
+                    case LIGHT_GRAY: red = 0xcc; green = 0xcc; blue = 0xcc; break;
+                    case DARK_GRAY: red = 0x77; green = 0x77; blue = 0x77; break;
+                }
+
+                int xPix = 0 - tilePixel;
+                xPix += 7;
+
+                int pixel = xPos + xPix;
+                if((scanline < 0) || (scanline > 143) || (pixel < 0) || (pixel > 159))
+                    continue;
+
+                /*
+                if(!priority)
+                    continue;
+                */
+
+                gameBoy->screenData[pixel][scanline][0] = red;
+                gameBoy->screenData[pixel][scanline][1] = green;
+                gameBoy->screenData[pixel][scanline][2] = blue;
+            }
+        }
+    }
+}
+
 Color getColor(GameBoy* gameBoy, uint16_t address, uint8_t colorNum) {
     Color res = WHITE;
     uint8_t palette = readFromMemory(gameBoy, address);
@@ -522,7 +520,6 @@ int main() {
         fprintf(stderr, "Could not create renderer\n");
         return 1;
     }
-
     /*
     SDL_Texture* texture = SDL_CreateTexture(
         renderer,
@@ -601,13 +598,12 @@ int main() {
     gameBoy.rom[0xff4b] = 0x00;
     gameBoy.rom[0xffff] = 0x00;
 
-    FILE* gameFile = fopen("tetris.gb", "rb");
+    FILE* gameFile = fopen("01-special.gb", "rb");
     fread(gameBoy.cartridge, 0x2000000, 1, gameFile);
     fclose(gameFile);
 
     memcpy(gameBoy.rom, gameBoy.cartridge, 0x8000);
 
-/*
     switch(gameBoy.cartridge[0x147]) {
         case 1: gameBoy.mBC1 = true; break;
         case 2: gameBoy.mBC1 = true; break;
@@ -616,7 +612,7 @@ int main() {
         case 6: gameBoy.mBC2 = true; break;
         default: break;
     }
-*/
+
     // 4.194304 MHz = 4194304 cycles per second
     // 59.727500569606 Hz = 59.727500569606 Frames per second
     // ~70224 cycles to 1 frame
@@ -656,7 +652,7 @@ int main() {
             if(!gameBoy.cpu.halted)
                 cycles = updateCPU(&gameBoy);
             // START TESTING SECTION
-            printCPU(&gameBoy.cpu);
+            //printCPU(&gameBoy.cpu);
             /*
             printf("PRESS ENTER TO CONTINUE\n");
             char test[80];
@@ -681,12 +677,14 @@ int main() {
                 SDL_RenderDrawPoint(renderer, x, y);
                 SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0);
             }
+        
         /*
         SDL_UpdateTexture(texture, NULL, gameBoy.screenData, WIDTH * sizeof(uint8_t) * 3);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         */
         SDL_RenderPresent(renderer);
+        
         double elapsedTime = clock() - startTime;
         if(elapsedTime <= TIME_BETWEEN_FRAMES) {
             struct timespec remainingTime = { 0 , TIME_BETWEEN_FRAMES - elapsedTime };

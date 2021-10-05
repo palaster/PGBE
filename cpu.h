@@ -15,6 +15,8 @@ typedef struct CPU {
     bool pendingInterruptDisable;
 } CPU;
 
+bool cpuDebug();
+
 uint8_t fetch(GameBoy* gameBoy);
 
 void push(GameBoy* gameBoy, uint8_t lower, uint8_t upper);
