@@ -1,0 +1,6 @@
+gameboy
+*.o
+*.gb
+*.so
+
+.vscode
