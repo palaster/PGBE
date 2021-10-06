@@ -3,7 +3,7 @@
 #include "bit_logic.h"
 #include "gameboy.h"
 
-bool cpuDebug() { return true; }
+bool cpuDebug() { return false; }
 
 uint8_t fetch(GameBoy* gameBoy) { return readFromMemory(gameBoy, gameBoy->cpu.pc++); }
 
@@ -1747,7 +1747,7 @@ int decodeAndExecuteCB(GameBoy* gameBoy, const uint8_t instruction) {
             return 8;
         }
         default: {
-            printf("CB Instruction Not Found: %u\n", instruction);
+            printf("CB Instruction Not Found: %x\n", instruction);
             exit(1);
         }
     }
@@ -1806,7 +1806,7 @@ void add_byte(GameBoy* gameBoy, uint8_t* des, uint8_t addend) {
     *des = (uint8_t) result;
     gameBoy->cpu.zero = (*des == 0);
     gameBoy->cpu.subtract = false;
-    gameBoy->cpu.halfCarry = (((first & 0xf) + (second & 0xf)) > 0xf);
+    gameBoy->cpu.halfCarry = ((first & 0xf) + (second & 0xf) > 0xf);
     gameBoy->cpu.carry = ((result & 0x100) != 0);
 }
 
@@ -1902,9 +1902,8 @@ void jp_from_pc(GameBoy* gameBoy) {
 void call(GameBoy* gameBoy) {
     uint8_t lowerNew = readFromMemory(gameBoy, gameBoy->cpu.pc++);
     uint8_t upperNew = readFromMemory(gameBoy, gameBoy->cpu.pc++);
-    uint16_t nextInstruction = gameBoy->cpu.pc;
-    uint8_t upperNext = (uint8_t) (nextInstruction >> 8);
-    uint8_t lowerNext = (uint8_t) (nextInstruction);
+    uint8_t upperNext = (uint8_t) (gameBoy->cpu.pc >> 8);
+    uint8_t lowerNext = (uint8_t) (gameBoy->cpu.pc);
     push(gameBoy, lowerNext, upperNext);
     jp_from_bytes(gameBoy, lowerNew, upperNew);
 }
@@ -2151,9 +2150,8 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0x22: {
             // LD (HL+), A
             if(cpuDebug()) printf("LD (HL+), A\n");
-            uint16_t hl = compose_bytes(gameBoy->cpu.l, gameBoy->cpu.h);
-            writeToMemory(gameBoy, hl++, gameBoy->cpu.a);
-            decompose_bytes(hl, &gameBoy->cpu.l, &gameBoy->cpu.h);
+            writeToMemory(gameBoy, compose_bytes(gameBoy->cpu.l, gameBoy->cpu.h), gameBoy->cpu.a);
+            inc_word(&gameBoy->cpu.l, &gameBoy->cpu.h);
             return 8;
         }
         case 0x23: {
@@ -2183,6 +2181,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0x27: {
             // DAA
             if(cpuDebug()) printf("DAA\n");
+            /*
             if(!gameBoy->cpu.subtract) {
                 if(gameBoy->cpu.carry || gameBoy->cpu.a > 0x99) {
                     gameBoy->cpu.a += 0x60;
@@ -2202,7 +2201,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
                 gameBoy->cpu.halfCarry = false;
             }
             gameBoy->cpu.zero = (gameBoy->cpu.a == 0);
-            /*
+            */
             uint16_t correction = (gameBoy->cpu.carry ? 0x60 : 0x00);
 
             if(gameBoy->cpu.halfCarry || (!gameBoy->cpu.subtract && ((gameBoy->cpu.a & 0x0f) > 9)))
@@ -2215,10 +2214,10 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             else
                 gameBoy->cpu.a = ((uint8_t) (gameBoy->cpu.a + correction));
 
+            if(((correction << 2) & 0x100) != 0)
+                gameBoy->cpu.carry = true;
             gameBoy->cpu.zero = (gameBoy->cpu.a == 0);
             gameBoy->cpu.halfCarry = false;
-            gameBoy->cpu.carry = (((correction << 2) & 0x100) != 0);
-            */
             return 4;
         }
         case 0x28: {
@@ -2240,10 +2239,11 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         }
         case 0x2a: {
             // LD A, (HL+)
-            if(cpuDebug()) printf("LD A, (HL+)\n");
             uint16_t hl = compose_bytes(gameBoy->cpu.l, gameBoy->cpu.h);
-            ld_byte(&gameBoy->cpu.a, readFromMemory(gameBoy, hl++));
-            decompose_bytes(hl, &gameBoy->cpu.l, &gameBoy->cpu.h);
+            uint8_t value = readFromMemory(gameBoy, hl);
+            if(cpuDebug()) printf("LD A, (HL+) (HL=%x)=%x\n", hl, value);
+            ld_byte(&gameBoy->cpu.a, value);
+            inc_word(&gameBoy->cpu.l, &gameBoy->cpu.h);
             return 8;
         }
         case 0x2b: {
@@ -2271,8 +2271,8 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             return 8;
         }
         case 0x2f: {
-            // CP A,L
-            if(cpuDebug()) printf("CP A,L\n");
+            // CPL
+            if(cpuDebug()) printf("CPL\n");
             gameBoy->cpu.a = ~gameBoy->cpu.a;
             gameBoy->cpu.subtract = true;
             gameBoy->cpu.halfCarry = true;
@@ -2300,9 +2300,8 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0x32: {
             // LD (HL-), A
             if(cpuDebug()) printf("LD (HL-), A\n");
-            uint16_t hl = compose_bytes(gameBoy->cpu.l, gameBoy->cpu.h);
-            writeToMemory(gameBoy, hl--, gameBoy->cpu.a);
-            decompose_bytes(hl, &gameBoy->cpu.l, &gameBoy->cpu.h);
+            writeToMemory(gameBoy, compose_bytes(gameBoy->cpu.l, gameBoy->cpu.h), gameBoy->cpu.a);
+            dec_word(&gameBoy->cpu.l, &gameBoy->cpu.h);
             return 8;
         }
         case 0x33: {
@@ -2367,9 +2366,8 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0x3a: {
             // LD A, (HL-)
             if(cpuDebug()) printf("LD A, (HL-)\n");
-            uint16_t hl = compose_bytes(gameBoy->cpu.l, gameBoy->cpu.h);
-            ld_byte(&gameBoy->cpu.a, readFromMemory(gameBoy, hl--));
-            decompose_bytes(hl, &gameBoy->cpu.l, &gameBoy->cpu.h);
+            ld_byte(&gameBoy->cpu.a, readFromMemory(gameBoy, compose_bytes(gameBoy->cpu.l, gameBoy->cpu.h)));
+            dec_word(&gameBoy->cpu.l, &gameBoy->cpu.h);
             return 8;
         }
         case 0x3b: {
@@ -3369,7 +3367,6 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             // RETI
             if(cpuDebug()) printf("RETI\n");
             ret(gameBoy);
-            // CHECK IF NEEDS TO PEND
             gameBoy->cpu.interruptsEnabled = true;
             return 16;
         }
@@ -3521,8 +3518,9 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             // LDH A, (u8)
             uint8_t offset = readFromMemory(gameBoy, gameBoy->cpu.pc++);
             uint16_t address = 0xff00 + offset;
-            if(cpuDebug()) printf("LDH A, (%u)\n", offset);
-            ld_byte(&gameBoy->cpu.a, readFromMemory(gameBoy, address));
+            uint8_t value = readFromMemory(gameBoy, address);
+            if(cpuDebug()) printf("LDH A, (0xff00 + %x)=%x\n", offset, value);
+            ld_byte(&gameBoy->cpu.a, value);
             return 12;
         }
         case 0xf1: {
@@ -3542,8 +3540,8 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0xf3: {
             // DI
             if(cpuDebug()) printf("DI\n");
-            //gameBoy->cpu.interrupts = false;
-            gameBoy->cpu.pendingInterruptDisable = true;
+            gameBoy->cpu.pendingInterruptEnable = false;
+            gameBoy->cpu.interruptsEnabled = false;
             return 4;
         }
         case 0xf4: {
@@ -3573,8 +3571,9 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             // LD HL, SP + i8
             if(cpuDebug()) printf("LD HL, SP + i8");
             int8_t value = (int8_t) readFromMemory(gameBoy, gameBoy->cpu.pc++);
-            uint16_t result = gameBoy->cpu.sp + value;
-            decompose_bytes(result, &gameBoy->cpu.l, &gameBoy->cpu.h);
+            int result = gameBoy->cpu.sp + value;
+            uint16_t result16 = (uint16_t) result;
+            decompose_bytes(result16, &gameBoy->cpu.l, &gameBoy->cpu.h);
             gameBoy->cpu.zero = false;
             gameBoy->cpu.subtract = false;
             gameBoy->cpu.halfCarry = (((gameBoy->cpu.sp ^ value ^ (result & 0xFFFF)) & 0x10) == 0x10);
@@ -3598,7 +3597,6 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0xfb: {
             // EI
             if(cpuDebug()) printf("EI\n");
-            //gameBoy->cpu.interrupts = true;
             gameBoy->cpu.pendingInterruptEnable = true;
             return 4;
         }
@@ -3615,7 +3613,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0xfe: {
             // CP A, u8
             uint8_t data = readFromMemory(gameBoy, gameBoy->cpu.pc++);
-            if(cpuDebug()) printf("CP A, u8(%u)\n", data);
+            if(cpuDebug()) printf("CP A, u8(%x)\n", data);
             cp_byte(gameBoy, gameBoy->cpu.a, data);
             return 4;
         }
@@ -3626,7 +3624,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             return 16;
         }
         default: {
-            printf("Instruction Not Found: %u\n", instruction);
+            printf("Instruction Not Found: %x\n", instruction);
             exit(1);
         }
     }
@@ -3635,17 +3633,12 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
 int updateCPU(GameBoy* gameBoy) {
     int cycles = 0;
     uint8_t instruction = fetch(gameBoy);
-    if(cpuDebug())
-        printf("Instruction: %x\n", instruction);
+    // if(cpuDebug()) printf("Instruction: %x\n", instruction);
     cycles += decodeAndExecute(gameBoy, instruction);
     if(gameBoy->cpu.pendingInterruptEnable) {    
         if(!gameBoy->cpu.interruptsEnabled)
             gameBoy->cpu.interruptsEnabled = true;
         gameBoy->cpu.pendingInterruptEnable = false;
-    } else if(gameBoy->cpu.pendingInterruptDisable) {
-        if(gameBoy->cpu.interruptsEnabled)
-            gameBoy->cpu.interruptsEnabled = false;
-        gameBoy->cpu.pendingInterruptDisable = false;
     }
     return cycles;
 }
@@ -3667,23 +3660,21 @@ uint8_t getFFlagsAsByte(CPU* cpu) {
 }
 
 void printCPU(CPU* cpu) {
+    printf("halted: %s\n", cpu->halted ? "true" : "false");
+    printf("Interrupts Enabled: %s\n", cpu->interruptsEnabled ? "true" : "false");
+    printf("Pending Interrupt Enable: %s\n", cpu->pendingInterruptEnable ? "true" : "false");
     printf("Zero: %s\n", cpu->zero ? "true" : "false");
     printf("Subtract: %s\n", cpu->subtract ? "true" : "false");
     printf("Half Carry: %s\n", cpu->halfCarry ? "true" : "false");
     printf("Carry: %s\n", cpu->carry ? "true" : "false");
-    printf("\n");
-    printf("halted: %s\n", cpu->halted ? "true" : "false");
-    printf("Interrupts Enabled: %s\n", cpu->interruptsEnabled ? "true" : "false");
-    printf("Pending Interrupt Enable: %s\n", cpu->pendingInterruptEnable ? "true" : "false");
-    printf("\n");
-    printf("PC: %x\n", cpu->pc);
-    printf("SP: %x\n", cpu->sp);
     printf("A: %x\n", cpu->a);
+    printf("F: %x\n", getFFlagsAsByte(cpu));
     printf("B: %x\n", cpu->b);
     printf("C: %x\n", cpu->c);
     printf("D: %x\n", cpu->d);
     printf("E: %x\n", cpu->e);
     printf("H: %x\n", cpu->h);
     printf("L: %x\n", cpu->l);
-    printf("\n");
+    printf("SP: %x\n", cpu->sp);
+    printf("PC: %x\n", cpu->pc);
 }

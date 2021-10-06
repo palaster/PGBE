@@ -43,6 +43,8 @@ typedef struct GameBoy {
     uint8_t screenData[WIDTH][HEIGHT][3];
 } GameBoy;
 
+bool gameboyDebug();
+
 void doDMATransfer(GameBoy* gameBoy, uint8_t value);
 
 void doRAMBankEnable(GameBoy* gameBoy, uint16_t address, uint8_t value);
@@ -62,8 +64,8 @@ void setClockFreq(GameBoy* gameBoy);
 void doDividerRegister(GameBoy* gameBoy, int cycles);
 
 void requestInterrupt(GameBoy* gameBoy, int id);
+/*int*/ void doInterrupts(GameBoy* gameBoy);
 void serviceInterrupt(GameBoy* gameBoy, int interrupt);
-int doInterrupts(GameBoy* gameBoy);
 
 bool isLCDEnabled(GameBoy* gameBoy);
 void setLCDStatus(GameBoy* gameBoy);

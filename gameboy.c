@@ -7,9 +7,11 @@
 #define VERTICAL_BLANK_SCAN_LINE_MAX 153
 #define SCANLINE_COUNTER_START 456
 
+bool gameboyDebug() { return false; }
+
 void doDMATransfer(GameBoy* gameBoy, uint8_t value) {
     uint16_t address = ((uint16_t) value) << 8;
-    for(uint8_t i = 0; i < 0xa0; i++)
+    for(int i = 0; i < 0xa0; i++)
         writeToMemory(gameBoy, 0xfe00 + i, readFromMemory(gameBoy, address + i));
 }
 
@@ -80,14 +82,12 @@ void handleBanking(GameBoy* gameBoy, uint16_t address, uint8_t value) {
 uint8_t readFromMemory(GameBoy* gameBoy, uint16_t address) {
     if((address >= 0x4000) && (address <= 0x7fff)) {
         uint16_t newAddress = address - 0x4000;
-        return gameBoy->cartridge[newAddress + ((gameBoy->currentROMBank - 1) * 0x4000)];
+        return gameBoy->cartridge[newAddress + (gameBoy->currentROMBank * 0x4000)];
     } else if((address >= 0xa000) && (address <= 0xbfff)) {
         uint16_t newAddress = address - 0xa000;
         return gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)];
     } else if((address >= 0xfea0) && (address <= 0xff00)) {
         return 0xff;
-    } else if(address == 0xffff) {
-        return gameBoy->cpu.interruptsEnabled;
     } else
         return gameBoy->rom[address];
 }
@@ -100,7 +100,7 @@ void writeToMemory(GameBoy* gameBoy, uint16_t address, uint8_t value) {
             uint16_t newAddress = address - 0xa000;
             gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)] = value;
         }
-    } else if((address >= 0xfea0) && (address <= 0xff00)) {
+    } else if((address >= 0xfea0) && (address <= 0xff00) || ((address >= 0xff4c) && (address <= 0xff7f))) {
         // RESTRICTED
     } else if((address >= 0xc000) && (address < 0xe000)) {
         gameBoy->rom[address] = value;
@@ -115,11 +115,11 @@ void writeToMemory(GameBoy* gameBoy, uint16_t address, uint8_t value) {
         if(currentFreq != newFreq)
             setClockFreq(gameBoy);
     } else if((address == 0xff04) || (address == 0xff44)) {
+        if(address == 0xff04)
+            gameBoy->dividerCounter = 0;
         gameBoy->rom[address] = 0;
     } else if(address == 0xff46) {
         doDMATransfer(gameBoy, value);
-    } else if(address == 0xffff) {
-        gameBoy->cpu.interruptsEnabled = value;
     } else
         gameBoy->rom[address] = value;
 }
@@ -167,13 +167,41 @@ void requestInterrupt(GameBoy* gameBoy, int id) {
     writeToMemory(gameBoy, 0xff0f, req);
 }
 
+
+/*int*/ void doInterrupts(GameBoy* gameBoy) {
+    /*
+    if(!gameBoy->cpu.interruptsEnabled && !gameBoy->cpu.halted)
+        return 0;
+
+    if(!gameBoy->cpu.interruptsEnabled && gameBoy->cpu.halted) {
+        gameBoy->cpu.halted = false;
+        return 0;
+    }
+    */
+    if(gameBoy->cpu.interruptsEnabled/* || gameBoy->cpu.halted*/) {
+        uint8_t req = readFromMemory(gameBoy, 0xff0f);
+        uint8_t enabled = readFromMemory(gameBoy, 0xffff);
+        if(req > 0)
+            for(int i = 0; i < 5; i++)
+                if(bit_value(req, i))
+                    if(bit_value(enabled, i)) {
+                        serviceInterrupt(gameBoy, i);
+                        //return 20;
+                    }
+    }
+
+//    return 0;
+}
+
 void serviceInterrupt(GameBoy* gameBoy, int interrupt) {
+    /*
     if(!gameBoy->cpu.interruptsEnabled && gameBoy->cpu.halted) {
         gameBoy->cpu.halted = false;
         return;
     }
+    */
     gameBoy->cpu.interruptsEnabled = false;
-    gameBoy->cpu.halted = false;
+    //gameBoy->cpu.halted = false;
     uint8_t req = readFromMemory(gameBoy, 0xff0f);
     req = reset_bit(req, interrupt);
     writeToMemory(gameBoy, 0xff0f, req);
@@ -186,30 +214,6 @@ void serviceInterrupt(GameBoy* gameBoy, int interrupt) {
         case 2: gameBoy->cpu.pc = 0x50; break;
         case 4: gameBoy->cpu.pc = 0x60; break;
     }
-}
-
-int doInterrupts(GameBoy* gameBoy) {
-    if(!gameBoy->cpu.interruptsEnabled && !gameBoy->cpu.halted)
-        return 0;
-
-    if(gameBoy->cpu.interruptsEnabled || gameBoy->cpu.halted) {
-        uint8_t req = readFromMemory(gameBoy, 0xff0f);
-        uint8_t enabled = readFromMemory(gameBoy, 0xffff);
-        if(req > 0)
-            for(int i = 0; i < 5; i++)
-                if(bit_value(req, i) == true)
-                    if(bit_value(enabled, i)) {
-                        serviceInterrupt(gameBoy, i);
-                        return 20;
-                    }
-    }
-    /*
-    if(!gameBoy->cpu.interrupts && gameBoy->cpu.halted) {
-        gameBoy->cpu.halted = false;
-        return 0;
-    }
-    */
-    return 0;
 }
 
 bool isLCDEnabled(GameBoy* gameBoy) { return bit_value(readFromMemory(gameBoy, 0xff40), 7); }
@@ -277,11 +281,13 @@ void updateGraphics(GameBoy* gameBoy, int cycles) {
         gameBoy->rom[0xff44]++;
         uint8_t currentLine = readFromMemory(gameBoy, 0xff44);
         gameBoy->scanlineCounter = SCANLINE_COUNTER_START;
-        if(currentLine == VERTICAL_BLANK_SCAN_LINE)
+        if(currentLine == VERTICAL_BLANK_SCAN_LINE) {
+            drawScanline(gameBoy);
             requestInterrupt(gameBoy, 0);
-        else if(currentLine > VERTICAL_BLANK_SCAN_LINE_MAX)
+        } else if(currentLine > VERTICAL_BLANK_SCAN_LINE_MAX) {
             gameBoy->rom[0xff44] = 0;
-        else if(currentLine < VERTICAL_BLANK_SCAN_LINE)
+            drawScanline(gameBoy);
+        } else if(currentLine < VERTICAL_BLANK_SCAN_LINE)
             drawScanline(gameBoy);
     }
 }
@@ -552,7 +558,6 @@ int main() {
     cpu.halted = false;
     cpu.interruptsEnabled = false;
     cpu.pendingInterruptEnable = false;
-    cpu.pendingInterruptDisable = false;
     cpu.pc = 0x0100;
     cpu.sp = 0xfffe;
     cpu.a = 0x01;
@@ -598,7 +603,7 @@ int main() {
     gameBoy.rom[0xff4b] = 0x00;
     gameBoy.rom[0xffff] = 0x00;
 
-    FILE* gameFile = fopen("01-special.gb", "rb");
+    FILE* gameFile = fopen("02-interrupts.gb", "rb");
     fread(gameBoy.cartridge, 0x2000000, 1, gameFile);
     fclose(gameFile);
 
@@ -622,14 +627,20 @@ int main() {
     /*
     FILE* log = fopen("log.txt", "ab+");
     */
-   /*
-    printCPU(&gameBoy.cpu);
-    
-    printf("PRESS ENTER TO CONTINUE\n");
-    char test[80];
-    fgets(test, sizeof test, stdin);
-    */
-    /**/
+    bool willRunUntilPC = false;
+    int pcToRunTo = 0x0;
+
+    if(gameboyDebug()) {
+        printCPU(&gameBoy.cpu);
+        printf("PRESS ENTER TO CONTINUE or PC to run to\n");
+        char test[80];
+        fgets(test, sizeof test, stdin);
+        if(strlen(test) > 0 && test[0] != '\0') {
+            sscanf(test, "%x", &pcToRunTo);
+            if(pcToRunTo > 0x0)
+                willRunUntilPC = true;
+        }
+    }
     // END TESTING SECTION
 
     bool shouldClose = false;
@@ -648,21 +659,39 @@ int main() {
         clock_t startTime = clock();
         int cyclesThisFrame = 0;
         while(cyclesThisFrame <= CYCLES_PER_FRAME) {
-            int cycles = 0;
+            int cycles = 4;
             if(!gameBoy.cpu.halted)
                 cycles = updateCPU(&gameBoy);
             // START TESTING SECTION
-            //printCPU(&gameBoy.cpu);
-            /*
-            printf("PRESS ENTER TO CONTINUE\n");
-            char test[80];
-            fgets(test, sizeof test, stdin);
-            */
+            if(gameBoy.rom[0xff02] == 0x81) {
+                char c = gameBoy.rom[0xff01];
+                printf("%c", c);
+                gameBoy.rom[0xff02] = 0x0;
+            }
+            if(gameboyDebug()) {
+                if(willRunUntilPC) {
+                    if(gameBoy.cpu.pc == pcToRunTo) {
+                        willRunUntilPC = false;
+                        pcToRunTo = 0x0;
+                    }
+                }
+                if(!willRunUntilPC) {
+                    printCPU(&gameBoy.cpu);
+                    printf("PRESS ENTER TO CONTINUE or PC to run to\n");
+                    char test[80];
+                    fgets(test, sizeof test, stdin);
+                    if(strlen(test) > 0 && test[0] != '\0') {
+                        sscanf(test, "%x", &pcToRunTo);
+                        if(pcToRunTo > 0x0)
+                            willRunUntilPC = true;
+                    }
+                }
+            }
             // END TESTING SECTION
             cyclesThisFrame += cycles;
             updateTimer(&gameBoy, cycles);
             updateGraphics(&gameBoy, cycles);
-            cyclesThisFrame += doInterrupts(&gameBoy);
+            /*cyclesThisFrame += */doInterrupts(&gameBoy);
         }
 
         /*

@@ -12,14 +12,13 @@ typedef struct CPU {
     bool halted;
     bool interruptsEnabled;
     bool pendingInterruptEnable;
-    bool pendingInterruptDisable;
 } CPU;
 
 bool cpuDebug();
 
 uint8_t fetch(GameBoy* gameBoy);
 
-void push(GameBoy* gameBoy, uint8_t lower, uint8_t upper);
+void pop(GameBoy* gameBoy, uint8_t* lower, uint8_t* upper);
 void push(GameBoy* gameBoy, uint8_t lower, uint8_t upper);
 
 void jp_from_word(GameBoy* gameBoy, uint16_t address);

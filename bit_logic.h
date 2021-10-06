@@ -7,7 +7,7 @@
 // SECOND METHOD byte, bitPosition = (byte >> bitposition) & 1
 
 static bool check_bit(uint8_t byte, uint8_t position) { return (byte & (1 << position)) != 0; } // aka GetVal
-//static bool check_bit(uint8_t byte, uint8_t position) { return byte & (1 << position); } // aka GetVal
+//static bool check_bit(uint8_t byte, uint8_t position) { return byte & (1 << position) != 0; } // aka GetVal
 static uint8_t bit_value(uint8_t byte, uint8_t position) { return (byte >> position) & 1; } // aka TestBit
 static uint8_t set_bit(uint8_t byte, uint8_t position) { return byte | (1 << position); }
 static uint8_t reset_bit(uint8_t byte, uint8_t position) { return byte & (~(1 << position)); }
