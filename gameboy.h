@@ -35,7 +35,9 @@ typedef struct GameBoy {
     bool enableRAM;
     bool mBC1;
     bool mBC2;
+    bool haltBug;
     CPU cpu;
+    uint8_t gamepadState;
     uint8_t currentROMBank;
     uint8_t currentRAMBank;
     uint8_t ramBanks[0x8000];
@@ -76,3 +78,7 @@ void drawScanline(GameBoy* gameBoy);
 void renderSprites(GameBoy* gameBoy);
 void renderTiles(GameBoy* gameBoy);
 Color getColor(GameBoy* gameBoy, const uint16_t address, const uint8_t colorNum);
+
+uint8_t getGamepadState(GameBoy* gameBoy);
+void keyPressed(GameBoy* gameBoy, const int key);
+void keyReleased(GameBoy* gameBoy, const int key);

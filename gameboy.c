@@ -86,8 +86,10 @@ uint8_t readFromMemory(GameBoy* gameBoy, const uint16_t address) {
     } else if((address >= 0xa000) && (address <= 0xbfff)) {
         uint16_t newAddress = address - 0xa000;
         return gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)];
-    } else if((address >= 0xfea0) && (address <= 0xff00)) {
+    } else if((address >= 0xfea0) && (address < 0xff00)) {
         return 0xff;
+    } else if(address == 0xff00) {
+        return getGamepadState(gameBoy);
     } else
         return gameBoy->rom[address];
 }
@@ -486,7 +488,50 @@ Color getColor(GameBoy* gameBoy, const uint16_t address, const uint8_t colorNum)
     return res;
 }
 
-int main() {
+uint8_t getGamepadState(GameBoy* gameBoy) {
+    uint8_t res = gameBoy->rom[0xff00];
+    res ^= 0xff;
+
+    if(!bit_value(res, 4)) {
+        uint8_t topGamepad = gameBoy->gamepadState >> 4;
+        topGamepad |= 0xf0;
+        res &= topGamepad;
+    } else if(!bit_value(res, 5)) {
+        uint8_t bottomGamepad = gameBoy->gamepadState & 0xf;
+        bottomGamepad |= 0xf0;
+        res &= bottomGamepad;
+    }
+
+    return res;
+}
+
+void keyPressed(GameBoy* gameBoy, const int key) {
+    bool previoslyUnset = false;
+
+    if(bit_value(gameBoy->gamepadState, key) == false)
+        previoslyUnset = true;
+
+    gameBoy->gamepadState = reset_bit(gameBoy->gamepadState, key);
+
+    bool button = key > 3;
+
+    uint8_t keyReq = gameBoy->rom[0xff00];
+    bool shouldRequestInterrupt = false;
+
+    if(button && !bit_value(keyReq, 5))
+        shouldRequestInterrupt = true;
+    else if(!button && !bit_value(keyReq, 4))
+        shouldRequestInterrupt = true;
+
+    if(shouldRequestInterrupt && !previoslyUnset)
+        requestInterrupt(gameBoy, 4);
+}
+
+void keyReleased(GameBoy* gameBoy, const int key) { gameBoy->gamepadState = set_bit(gameBoy->gamepadState, key); }
+
+int main(int argc, char *argv[]) {
+    if(argc != 2)
+        return 1;
 
     if(SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "Could not init SDL: %s\n", SDL_GetError());
@@ -528,6 +573,8 @@ int main() {
     gameBoy.enableRAM = false;
     gameBoy.mBC1 = false;
     gameBoy.mBC2 = false;
+    gameBoy.haltBug = false;
+    gameBoy.gamepadState = 0xff;
     gameBoy.currentROMBank = 1;
     gameBoy.currentRAMBank = 0;
     
@@ -586,7 +633,7 @@ int main() {
     gameBoy.rom[0xff4b] = 0x00;
     gameBoy.rom[0xffff] = 0x00;
 
-    FILE* gameFile = fopen("tetris.gb", "rb");
+    FILE* gameFile = fopen(argv[1], "rb");
     fread(gameBoy.cartridge, 0x2000000, 1, gameFile);
     fclose(gameFile);
 
@@ -633,11 +680,45 @@ int main() {
         SDL_Event e;
         while(SDL_PollEvent(&e) > 0) {
             switch(e.type) {
-                case  SDL_QUIT:
+                case  SDL_QUIT: {
                     shouldClose = true;
                     break;
+                }
+                case SDL_KEYDOWN: {
+                    if(e.key.repeat) break;
+                    int key = -1;
+                    switch(e.key.keysym.sym) {
+                        case SDLK_w: key = 2; break; // UP
+                        case SDLK_a: key = 1; break; // Left
+                        case SDLK_s: key = 3; break; // Down
+                        case SDLK_d: key = 0; break; // Right
+                        case SDLK_h: key = 4; break; // B
+                        case SDLK_u: key = 5; break; // A
+                        case SDLK_b: key = 7; break; // Select
+                        case SDLK_n: key = 6; break; // Start
+                    }
+                    if(key >= 0)
+                        keyPressed(&gameBoy, key);
+                    break;
+                }
+                case SDL_KEYUP: {
+                    if(e.key.repeat) break;
+                    int key = -1;
+                    switch(e.key.keysym.sym) {
+                        case SDLK_w: key = 2; break; // UP
+                        case SDLK_a: key = 1; break; // Left
+                        case SDLK_s: key = 3; break; // Down
+                        case SDLK_d: key = 0; break; // Right
+                        case SDLK_h: key = 4; break; // B
+                        case SDLK_u: key = 5; break; // A
+                        case SDLK_b: key = 7; break; // Select
+                        case SDLK_n: key = 6; break; // Start
+                    }
+                    if(key != -1)
+                        keyReleased(&gameBoy, key);
+                    break;
+                }
             }
-            SDL_UpdateWindowSurface(screen);
         }
 
         clock_t startTime = clock();
@@ -645,14 +726,14 @@ int main() {
         while(cyclesThisFrame <= CYCLES_PER_FRAME) {
             int cycles = 4;
             if(!gameBoy.cpu.halted)
-                cycles = updateCPU(&gameBoy);
+                cycles = updateCPU(&gameBoy) * 4;
             // START TESTING SECTION
-            if(gameBoy.rom[0xff02] == 0x81) {
-                char c = gameBoy.rom[0xff01];
-                printf("%c", c);
-                gameBoy.rom[0xff02] = 0x0;
-            }
             if(gameboyDebug()) {
+                if(gameBoy.rom[0xff02] == 0x81) {
+                    char c = gameBoy.rom[0xff01];
+                    printf("%c", c);
+                    gameBoy.rom[0xff02] = 0x0;
+                }
                 if(willRunUntilPC) {
                     if(gameBoy.cpu.pc == pcToRunTo) {
                         willRunUntilPC = false;
