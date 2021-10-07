@@ -64,7 +64,7 @@ void setClockFreq(GameBoy* gameBoy);
 void doDividerRegister(GameBoy* gameBoy, int cycles);
 
 void requestInterrupt(GameBoy* gameBoy, int id);
-/*int*/ void doInterrupts(GameBoy* gameBoy);
+int doInterrupts(GameBoy* gameBoy);
 void serviceInterrupt(GameBoy* gameBoy, int interrupt);
 
 bool isLCDEnabled(GameBoy* gameBoy);

@@ -104,7 +104,8 @@ void writeToMemory(GameBoy* gameBoy, uint16_t address, uint8_t value) {
         // RESTRICTED
     } else if((address >= 0xc000) && (address < 0xe000)) {
         gameBoy->rom[address] = value;
-        gameBoy->rom[address + 0x2000] = value;
+        if(address + 0x2000 <= 0xfdd)
+            gameBoy->rom[address + 0x2000] = value;
     } else if((address >= 0xe000) && (address < 0xfe00)) {
         gameBoy->rom[address] = value;
         gameBoy->rom[address - 0x2000] = value;
@@ -167,41 +168,29 @@ void requestInterrupt(GameBoy* gameBoy, int id) {
     writeToMemory(gameBoy, 0xff0f, req);
 }
 
-
-/*int*/ void doInterrupts(GameBoy* gameBoy) {
-    /*
-    if(!gameBoy->cpu.interruptsEnabled && !gameBoy->cpu.halted)
+int doInterrupts(GameBoy* gameBoy) {
+    uint8_t req = readFromMemory(gameBoy, 0xff0f);
+    uint8_t enabled = readFromMemory(gameBoy, 0xffff);
+    uint8_t potentialForInterrupts = req & enabled;
+    if(potentialForInterrupts == 0)
         return 0;
-
-    if(!gameBoy->cpu.interruptsEnabled && gameBoy->cpu.halted) {
+    else
         gameBoy->cpu.halted = false;
-        return 0;
-    }
-    */
-    if(gameBoy->cpu.interruptsEnabled/* || gameBoy->cpu.halted*/) {
-        uint8_t req = readFromMemory(gameBoy, 0xff0f);
-        uint8_t enabled = readFromMemory(gameBoy, 0xffff);
+    gameBoy->cpu.halted = false;
+    if(gameBoy->cpu.interruptsEnabled) {
         if(req > 0)
             for(int i = 0; i < 5; i++)
                 if(bit_value(req, i))
                     if(bit_value(enabled, i)) {
                         serviceInterrupt(gameBoy, i);
-                        //return 20;
+                        return 20;
                     }
     }
-
-//    return 0;
+    return 0;
 }
 
 void serviceInterrupt(GameBoy* gameBoy, int interrupt) {
-    /*
-    if(!gameBoy->cpu.interruptsEnabled && gameBoy->cpu.halted) {
-        gameBoy->cpu.halted = false;
-        return;
-    }
-    */
     gameBoy->cpu.interruptsEnabled = false;
-    //gameBoy->cpu.halted = false;
     uint8_t req = readFromMemory(gameBoy, 0xff0f);
     req = reset_bit(req, interrupt);
     writeToMemory(gameBoy, 0xff0f, req);
@@ -282,11 +271,9 @@ void updateGraphics(GameBoy* gameBoy, int cycles) {
         uint8_t currentLine = readFromMemory(gameBoy, 0xff44);
         gameBoy->scanlineCounter = SCANLINE_COUNTER_START;
         if(currentLine == VERTICAL_BLANK_SCAN_LINE) {
-            drawScanline(gameBoy);
             requestInterrupt(gameBoy, 0);
         } else if(currentLine > VERTICAL_BLANK_SCAN_LINE_MAX) {
             gameBoy->rom[0xff44] = 0;
-            drawScanline(gameBoy);
         } else if(currentLine < VERTICAL_BLANK_SCAN_LINE)
             drawScanline(gameBoy);
     }
@@ -603,7 +590,7 @@ int main() {
     gameBoy.rom[0xff4b] = 0x00;
     gameBoy.rom[0xffff] = 0x00;
 
-    FILE* gameFile = fopen("02-interrupts.gb", "rb");
+    FILE* gameFile = fopen("tetris.gb", "rb");
     fread(gameBoy.cartridge, 0x2000000, 1, gameFile);
     fclose(gameFile);
 
@@ -629,6 +616,7 @@ int main() {
     */
     bool willRunUntilPC = false;
     int pcToRunTo = 0x0;
+    bool previousCarry = gameBoy.cpu.carry;
 
     if(gameboyDebug()) {
         printCPU(&gameBoy.cpu);
@@ -674,6 +662,12 @@ int main() {
                         willRunUntilPC = false;
                         pcToRunTo = 0x0;
                     }
+                    if(previousCarry != gameBoy.cpu.carry) {
+                        printf("Carry Changed at PC:%x\n", gameBoy.cpu.pc - 1);
+                        printf("Old Carry Value = %d\n", previousCarry);
+                        printf("New Carry Value = %d\n", gameBoy.cpu.carry);
+                        previousCarry = gameBoy.cpu.carry;
+                    }
                 }
                 if(!willRunUntilPC) {
                     printCPU(&gameBoy.cpu);
@@ -691,7 +685,7 @@ int main() {
             cyclesThisFrame += cycles;
             updateTimer(&gameBoy, cycles);
             updateGraphics(&gameBoy, cycles);
-            /*cyclesThisFrame += */doInterrupts(&gameBoy);
+            cyclesThisFrame += doInterrupts(&gameBoy);
         }
 
         /*
