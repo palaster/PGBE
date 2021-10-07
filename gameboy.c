@@ -86,8 +86,6 @@ uint8_t readFromMemory(GameBoy* gameBoy, const uint16_t address) {
     } else if((address >= 0xa000) && (address <= 0xbfff)) {
         uint16_t newAddress = address - 0xa000;
         return gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)];
-    } else if((address >= 0xfea0) && (address < 0xff00)) {
-        return 0xff;
     } else if(address == 0xff00) {
         return getGamepadState(gameBoy);
     } else
@@ -102,11 +100,11 @@ void writeToMemory(GameBoy* gameBoy, const uint16_t address, const uint8_t value
             uint16_t newAddress = address - 0xa000;
             gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)] = value;
         }
-    } else if((address >= 0xfea0) && (address <= 0xff00) || ((address >= 0xff4c) && (address <= 0xff7f))) {
+    } else if((address >= 0xfea0) && (address < 0xff00)) {
         // RESTRICTED
     } else if((address >= 0xc000) && (address < 0xe000)) {
         gameBoy->rom[address] = value;
-        if(address + 0x2000 <= 0xfdd)
+        if(address + 0x2000 <= 0xfdff)
             gameBoy->rom[address + 0x2000] = value;
     } else if((address >= 0xe000) && (address < 0xfe00)) {
         gameBoy->rom[address] = value;
@@ -173,20 +171,20 @@ void requestInterrupt(GameBoy* gameBoy, const int interrupt_id) {
 int doInterrupts(GameBoy* gameBoy) {
     uint8_t req = readFromMemory(gameBoy, 0xff0f);
     uint8_t enabled = readFromMemory(gameBoy, 0xffff);
+    /*
     uint8_t potentialForInterrupts = req & enabled;
     if(potentialForInterrupts == 0)
         return 0;
     else
         gameBoy->cpu.halted = false;
     gameBoy->cpu.halted = false;
+    */
     if(gameBoy->cpu.interruptsEnabled) {
         if(req > 0)
             for(int i = 0; i < 5; i++)
                 if(bit_value(req, i))
-                    if(bit_value(enabled, i)) {
+                    if(bit_value(enabled, i))
                         serviceInterrupt(gameBoy, i);
-                        return 20;
-                    }
     }
     return 0;
 }
