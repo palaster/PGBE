@@ -12,7 +12,7 @@ void pop(GameBoy* gameBoy, uint8_t* lower, uint8_t* upper) {
     *upper = readFromMemory(gameBoy, gameBoy->cpu.sp++);
 }
 
-void push(GameBoy* gameBoy, uint8_t lower, uint8_t upper) {
+void push(GameBoy* gameBoy, const uint8_t lower, const uint8_t upper) {
     writeToMemory(gameBoy, --gameBoy->cpu.sp, upper);
     writeToMemory(gameBoy, --gameBoy->cpu.sp, lower);
 }
@@ -25,9 +25,7 @@ void rlc(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = carry;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void rrc(GameBoy* gameBoy, uint8_t* reg) {
@@ -37,10 +35,8 @@ void rrc(GameBoy* gameBoy, uint8_t* reg) {
     *reg = result;
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
-    gameBoy->cpu.halfCarry = false;   
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
+    gameBoy->cpu.halfCarry = false;
     gameBoy->cpu.carry = carry;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void rl(GameBoy* gameBoy, uint8_t* reg) {
@@ -52,9 +48,7 @@ void rl(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = willCarry;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void rr(GameBoy* gameBoy, uint8_t* reg) {
@@ -66,9 +60,7 @@ void rr(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = willCarry;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void sla(GameBoy* gameBoy, uint8_t* reg) {
@@ -78,9 +70,7 @@ void sla(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = carry;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void sra(GameBoy* gameBoy, uint8_t* reg) {
@@ -92,9 +82,7 @@ void sra(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = carry;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void srl(GameBoy* gameBoy, uint8_t* reg) {
@@ -104,9 +92,7 @@ void srl(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = leastBitSet;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void swap(GameBoy* gameBoy, uint8_t* reg) {
@@ -120,17 +106,17 @@ void swap(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.carry = false;
 }
 
-void bit(GameBoy* gameBoy, uint8_t bit, uint8_t reg) {
+void bit(GameBoy* gameBoy, const uint8_t bit, const uint8_t reg) {
     gameBoy->cpu.zero = !check_bit(reg, bit);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = true;
 }
 
-void set(GameBoy* gameBoy, uint8_t bit, uint8_t* reg) {
+void set(GameBoy* gameBoy, const uint8_t bit, uint8_t* reg) {
     *reg = set_bit(*reg, bit);
 }
 
-void res(GameBoy* gameBoy, uint8_t bit, uint8_t* reg) {
+void res(GameBoy* gameBoy, const uint8_t bit, uint8_t* reg) {
     *reg = reset_bit(*reg, bit);
 }
 
@@ -1767,12 +1753,12 @@ int decodeAndExecuteCB(GameBoy* gameBoy, const uint8_t instruction) {
     }
 }
 
-void ld_word(uint8_t* lowerDes, uint8_t* upperDes, uint8_t lower, uint8_t upper) {
+void ld_word(uint8_t* lowerDes, uint8_t* upperDes, const uint8_t lower, const uint8_t upper) {
     *lowerDes = lower;
     *upperDes = upper;
 }
 
-void ld_byte(uint8_t* des, uint8_t src) { *des = src; }
+void ld_byte(uint8_t* des, const uint8_t src) { *des = src; }
 
 void inc_word(uint8_t* lower, uint8_t* upper) {
     uint16_t word = compose_bytes(*lower, *upper);
@@ -1802,7 +1788,7 @@ void dec_byte(GameBoy* gameBoy, uint8_t* reg) {
     gameBoy->cpu.halfCarry = ((*reg & 0x0f) == 0x0f);
 }
 
-void add_word(GameBoy* gameBoy, uint8_t* lowerDes, uint8_t* upperDes, uint8_t lower, uint8_t upper) {
+void add_word(GameBoy* gameBoy, uint8_t* lowerDes, uint8_t* upperDes, const uint8_t lower, const uint8_t upper) {
     uint16_t desWord = compose_bytes(*lowerDes, *upperDes);
     uint16_t srcWord = compose_bytes(lower, upper);
     unsigned int result = (desWord + srcWord);
@@ -1810,12 +1796,10 @@ void add_word(GameBoy* gameBoy, uint8_t* lowerDes, uint8_t* upperDes, uint8_t lo
     *lowerDes = (uint8_t) (result);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = ((desWord & 0xfff) + (srcWord & 0xfff) > 0xfff);
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = ((result & 0x10000) != 0);
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void add_byte(GameBoy* gameBoy, uint8_t* des, uint8_t addend) {
+void add_byte(GameBoy* gameBoy, uint8_t* des, const uint8_t addend) {
     uint8_t first = *des;
     uint8_t second = addend;
     unsigned int result = first + second;
@@ -1823,12 +1807,10 @@ void add_byte(GameBoy* gameBoy, uint8_t* des, uint8_t addend) {
     gameBoy->cpu.zero = (*des == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = ((first & 0xf) + (second & 0xf) > 0xf);
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = ((result & 0x100) != 0);
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void adc_byte(GameBoy* gameBoy, uint8_t* des, uint8_t addend) {
+void adc_byte(GameBoy* gameBoy, uint8_t* des, const uint8_t addend) {
     uint8_t first = *des;
     uint8_t second = addend;
     uint8_t carry = gameBoy->cpu.carry;
@@ -1837,12 +1819,10 @@ void adc_byte(GameBoy* gameBoy, uint8_t* des, uint8_t addend) {
     gameBoy->cpu.zero = (*des == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = (((first & 0xf) + (second & 0xf) + carry) > 0xf);
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = (result > 0xff);
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void sub_byte(GameBoy* gameBoy, uint8_t* des, uint8_t subtrahend) {
+void sub_byte(GameBoy* gameBoy, uint8_t* des, const uint8_t subtrahend) {
     uint8_t first = *des;
     uint8_t second = subtrahend;
     uint8_t result = first - second;
@@ -1850,12 +1830,10 @@ void sub_byte(GameBoy* gameBoy, uint8_t* des, uint8_t subtrahend) {
     gameBoy->cpu.zero = (*des == 0);
     gameBoy->cpu.subtract = true;
     gameBoy->cpu.halfCarry = (((first & 0xf) - (second & 0xf)) < 0);
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = (first < second);
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void sbc_byte(GameBoy* gameBoy, uint8_t* des, uint8_t subtrahend) {
+void sbc_byte(GameBoy* gameBoy, uint8_t* des, const uint8_t subtrahend) {
     uint8_t first = *des;
     uint8_t second = subtrahend;
     uint8_t carry = gameBoy->cpu.carry;
@@ -1864,54 +1842,44 @@ void sbc_byte(GameBoy* gameBoy, uint8_t* des, uint8_t subtrahend) {
     gameBoy->cpu.zero = (*des == 0);
     gameBoy->cpu.subtract = true;
     gameBoy->cpu.halfCarry = (((first & 0xf) - (second & 0xf) - carry) < 0);
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = (result < 0);
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void and_byte(GameBoy* gameBoy, uint8_t* des, uint8_t value) {
+void and_byte(GameBoy* gameBoy, uint8_t* des, const uint8_t value) {
     uint8_t result = *des & value;
     *des = result;
     gameBoy->cpu.zero = (*des == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = true;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = false;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void xor_byte(GameBoy* gameBoy, uint8_t* des, uint8_t value) {
+void xor_byte(GameBoy* gameBoy, uint8_t* des, const uint8_t value) {
     uint8_t result = *des ^ value;
     *des = result;
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = false;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void or_byte(GameBoy* gameBoy, uint8_t* des, uint8_t value) {
+void or_byte(GameBoy* gameBoy, uint8_t* des, const uint8_t value) {
     uint8_t result = *des | value;
     *des = result;
     gameBoy->cpu.zero = (*des == 0);
     gameBoy->cpu.subtract = false;
     gameBoy->cpu.halfCarry = false;
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = false;
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
-void cp_byte(GameBoy* gameBoy, uint8_t des, uint8_t value) {
+void cp_byte(GameBoy* gameBoy, const uint8_t des, const uint8_t value) {
     uint8_t first = des;
     uint8_t second = value;
     uint8_t result = first - second;
     gameBoy->cpu.zero = (result == 0);
     gameBoy->cpu.subtract = true;
     gameBoy->cpu.halfCarry = (((first & 0xf) - (second & 0xf)) < 0);
-    if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
     gameBoy->cpu.carry = (first < second);
-    if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
 }
 
 void ret(GameBoy* gameBoy) {
@@ -1921,9 +1889,9 @@ void ret(GameBoy* gameBoy) {
     jp_from_bytes(gameBoy, lower, upper);
 }
 
-void jp_from_word(GameBoy* gameBoy, uint16_t address) { gameBoy->cpu.pc = address; }
+void jp_from_word(GameBoy* gameBoy, const uint16_t address) { gameBoy->cpu.pc = address; }
 
-void jp_from_bytes(GameBoy* gameBoy, uint8_t lower, uint8_t upper) { jp_from_word(gameBoy, compose_bytes(lower, upper)); }
+void jp_from_bytes(GameBoy* gameBoy, const uint8_t lower, const uint8_t upper) { jp_from_word(gameBoy, compose_bytes(lower, upper)); }
 
 void jp_from_pc(GameBoy* gameBoy) {
     uint8_t lower = readFromMemory(gameBoy, gameBoy->cpu.pc++);
@@ -1940,7 +1908,7 @@ void call(GameBoy* gameBoy) {
     jp_from_bytes(gameBoy, lowerNew, upperNew);
 }
 
-void rst(GameBoy* gameBoy, uint8_t value) {
+void rst(GameBoy* gameBoy, const uint8_t value) {
     uint8_t upper = (uint8_t) (gameBoy->cpu.pc >> 8);
     uint8_t lower = (uint8_t) (gameBoy->cpu.pc);
     push(gameBoy, lower, upper);
@@ -2213,27 +2181,6 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
         case 0x27: {
             // DAA
             if(cpuDebug()) printf("DAA\n");
-            /*
-            if(!gameBoy->cpu.subtract) {
-                if(gameBoy->cpu.carry || gameBoy->cpu.a > 0x99) {
-                    gameBoy->cpu.a += 0x60;
-                    gameBoy->cpu.carry = true;
-                }
-                if(gameBoy->cpu.halfCarry || (gameBoy->cpu.a & 0xf) > 0x9) {
-                    gameBoy->cpu.a += 0x06;
-                    gameBoy->cpu.halfCarry = false;
-                }
-            } else if(gameBoy->cpu.carry && gameBoy->cpu.halfCarry) {
-                gameBoy->cpu.a += 0x9a;
-                gameBoy->cpu.halfCarry = false;
-            } else if(gameBoy->cpu.carry) {
-                gameBoy->cpu.a += 0xa0;
-            } else if(gameBoy->cpu.halfCarry) {
-                gameBoy->cpu.a += 0xfa;
-                gameBoy->cpu.halfCarry = false;
-            }
-            gameBoy->cpu.zero = (gameBoy->cpu.a == 0);
-            */
             uint16_t correction = (gameBoy->cpu.carry ? 0x60 : 0x00);
 
             if(gameBoy->cpu.halfCarry || (!gameBoy->cpu.subtract && ((gameBoy->cpu.a & 0x0f) > 9)))
@@ -2246,10 +2193,8 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             else
                 gameBoy->cpu.a = ((uint8_t) (gameBoy->cpu.a + correction));
 
-            if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
             if(((correction << 2) & 0x100) != 0)
                 gameBoy->cpu.carry = true;
-            if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
             gameBoy->cpu.zero = (gameBoy->cpu.a == 0);
             gameBoy->cpu.halfCarry = false;
             return 4;
@@ -2374,9 +2319,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             if(cpuDebug()) printf("SCF\n");
             gameBoy->cpu.subtract = false;
             gameBoy->cpu.halfCarry = false;
-            if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
             gameBoy->cpu.carry = true;
-            if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
             return 4;
         }
         case 0x38: {
@@ -2435,9 +2378,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             if(cpuDebug()) printf("CCF\n");
             gameBoy->cpu.subtract = false;
             gameBoy->cpu.halfCarry = false;
-            if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
             gameBoy->cpu.carry = !gameBoy->cpu.carry;
-            if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
             return 4;
         }
         case 0x40: {
@@ -3508,9 +3449,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             gameBoy->cpu.zero = false;
             gameBoy->cpu.subtract = false;
             gameBoy->cpu.halfCarry = (((sp ^ value ^ (result & 0xFFFF)) & 0x10) == 0x10);
-            if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
             gameBoy->cpu.carry = (((sp ^ value ^ (result & 0xFFFF)) & 0x100) == 0x100);
-            if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
             return 16;
         }
         case 0xe9: {
@@ -3617,9 +3556,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             gameBoy->cpu.zero = false;
             gameBoy->cpu.subtract = false;
             gameBoy->cpu.halfCarry = (((gameBoy->cpu.sp ^ value ^ (result & 0xFFFF)) & 0x10) == 0x10);
-            if(cpuDebug()) printf("Carry Before = %d\n", gameBoy->cpu.carry);
             gameBoy->cpu.carry = (((gameBoy->cpu.sp ^ value ^ (result & 0xFFFF)) & 0x100) == 0x100);
-            if(cpuDebug()) printf("Carry After = %d\n", gameBoy->cpu.carry);
             return 12;
         }
         case 0xf9: {
@@ -3677,7 +3614,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
 int updateCPU(GameBoy* gameBoy) {
     int cycles = 0;
     uint8_t instruction = fetch(gameBoy);
-    // if(cpuDebug()) printf("Instruction: %x\n", instruction);
+    if(cpuDebug()) printf("Instruction: %x\n", instruction);
     cycles += decodeAndExecute(gameBoy, instruction);
     if(gameBoy->cpu.pendingInterruptEnable) {    
         if(!gameBoy->cpu.interruptsEnabled)

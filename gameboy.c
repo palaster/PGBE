@@ -9,13 +9,13 @@
 
 bool gameboyDebug() { return false; }
 
-void doDMATransfer(GameBoy* gameBoy, uint8_t value) {
+void doDMATransfer(GameBoy* gameBoy, const uint8_t value) {
     uint16_t address = ((uint16_t) value) << 8;
     for(int i = 0; i < 0xa0; i++)
         writeToMemory(gameBoy, 0xfe00 + i, readFromMemory(gameBoy, address + i));
 }
 
-void doRAMBankEnable(GameBoy* gameBoy, uint16_t address, uint8_t value) {
+void doRAMBankEnable(GameBoy* gameBoy, const uint16_t address, const uint8_t value) {
     if(gameBoy->mBC2)
         if(bit_value(address, 4) == 1)
             return;
@@ -26,7 +26,7 @@ void doRAMBankEnable(GameBoy* gameBoy, uint16_t address, uint8_t value) {
         gameBoy->enableRAM = false;
 }
 
-void doChangeLoROMBank(GameBoy* gameBoy, uint8_t value) {
+void doChangeLoROMBank(GameBoy* gameBoy, const uint8_t value) {
     if(gameBoy->mBC2) {
         gameBoy->currentROMBank = (value & 0xf);
         if(gameBoy->currentROMBank == 0)
@@ -40,26 +40,26 @@ void doChangeLoROMBank(GameBoy* gameBoy, uint8_t value) {
         gameBoy->currentROMBank++;
 }
 
-void doChangeHiROMBank(GameBoy* gameBoy, uint8_t value) {
+void doChangeHiROMBank(GameBoy* gameBoy, const uint8_t value) {
+    uint8_t newValue = value & 224;
     gameBoy->currentROMBank &= 31;
-    value &= 224;
-    gameBoy->currentROMBank |= value;
+    gameBoy->currentROMBank |= newValue;
     if(gameBoy->currentROMBank == 0)
         gameBoy->currentROMBank++;
 }
 
-void doRAMBankChange(GameBoy* gameBoy, uint8_t value) {
+void doRAMBankChange(GameBoy* gameBoy, const uint8_t value) {
     gameBoy->currentRAMBank = (value & 0x3);
 }
 
-void doChangeROMRAMMode(GameBoy* gameBoy, uint8_t value) {
+void doChangeROMRAMMode(GameBoy* gameBoy, const uint8_t value) {
     uint8_t newValue = value & 0x1;
     gameBoy->romBanking = (newValue == 0);
     if(gameBoy->romBanking)
         gameBoy->currentRAMBank = 0;
 }
 
-void handleBanking(GameBoy* gameBoy, uint16_t address, uint8_t value) {
+void handleBanking(GameBoy* gameBoy, const uint16_t address, const uint8_t value) {
     if(address < 0x2000) {
         if(gameBoy->mBC1 || gameBoy->mBC2)
             doRAMBankEnable(gameBoy, address, value);
@@ -79,7 +79,7 @@ void handleBanking(GameBoy* gameBoy, uint16_t address, uint8_t value) {
     }
 }
 
-uint8_t readFromMemory(GameBoy* gameBoy, uint16_t address) {
+uint8_t readFromMemory(GameBoy* gameBoy, const uint16_t address) {
     if((address >= 0x4000) && (address <= 0x7fff)) {
         uint16_t newAddress = address - 0x4000;
         return gameBoy->cartridge[newAddress + (gameBoy->currentROMBank * 0x4000)];
@@ -92,7 +92,7 @@ uint8_t readFromMemory(GameBoy* gameBoy, uint16_t address) {
         return gameBoy->rom[address];
 }
 
-void writeToMemory(GameBoy* gameBoy, uint16_t address, uint8_t value) {
+void writeToMemory(GameBoy* gameBoy, const uint16_t address, const uint8_t value) {
     if(address < 0x8000) {
         handleBanking(gameBoy, address, value);
     } else if((address >= 0xa000) && (address < 0xc000)) {
@@ -125,7 +125,7 @@ void writeToMemory(GameBoy* gameBoy, uint16_t address, uint8_t value) {
         gameBoy->rom[address] = value;
 }
 
-void updateTimer(GameBoy* gameBoy, int cycles) {
+void updateTimer(GameBoy* gameBoy, const int cycles) {
     doDividerRegister(gameBoy, cycles);
     if(isClockEnabled(gameBoy)) {
         gameBoy->timerCounter -= cycles;
@@ -154,7 +154,7 @@ void setClockFreq(GameBoy* gameBoy) {
     }
 }
 
-void doDividerRegister(GameBoy* gameBoy, int cycles) {
+void doDividerRegister(GameBoy* gameBoy, const int cycles) {
     gameBoy->dividerCounter += cycles;
     if(gameBoy->dividerCounter >= 255) {
         gameBoy->dividerCounter = 0;
@@ -162,9 +162,9 @@ void doDividerRegister(GameBoy* gameBoy, int cycles) {
     }
 }
 
-void requestInterrupt(GameBoy* gameBoy, int id) {
+void requestInterrupt(GameBoy* gameBoy, const int interrupt_id) {
     uint8_t req = readFromMemory(gameBoy, 0xff0f);
-    req = set_bit(req, id);
+    req = set_bit(req, interrupt_id);
     writeToMemory(gameBoy, 0xff0f, req);
 }
 
@@ -189,15 +189,15 @@ int doInterrupts(GameBoy* gameBoy) {
     return 0;
 }
 
-void serviceInterrupt(GameBoy* gameBoy, int interrupt) {
+void serviceInterrupt(GameBoy* gameBoy, const int interrupt_id) {
     gameBoy->cpu.interruptsEnabled = false;
     uint8_t req = readFromMemory(gameBoy, 0xff0f);
-    req = reset_bit(req, interrupt);
+    req = reset_bit(req, interrupt_id);
     writeToMemory(gameBoy, 0xff0f, req);
 
     push(gameBoy, (uint8_t) gameBoy->cpu.pc, (uint8_t) (gameBoy->cpu.pc >> 8));
 
-    switch(interrupt) {
+    switch(interrupt_id) {
         case 0: gameBoy->cpu.pc = 0x40; break;
         case 1: gameBoy->cpu.pc = 0x48; break;
         case 2: gameBoy->cpu.pc = 0x50; break;
@@ -259,7 +259,7 @@ void setLCDStatus(GameBoy* gameBoy) {
     writeToMemory(gameBoy, 0xff41, status);
 }
 
-void updateGraphics(GameBoy* gameBoy, int cycles) {
+void updateGraphics(GameBoy* gameBoy, const int cycles) {
     setLCDStatus(gameBoy);
     if(isLCDEnabled(gameBoy))
         gameBoy->scanlineCounter -= cycles;
@@ -399,10 +399,7 @@ void renderSprites(GameBoy* gameBoy) {
         int scanline = readFromMemory(gameBoy, 0xff44);
 
         int ySize = use8x16 ? 16 : 8;
-        /*
-        if(use8x16)
-            ySize = 16;
-        */
+
         if((scanline >= yPos) && (scanline < (yPos + ySize))) {
             int line = scanline - yPos;
 
@@ -462,7 +459,7 @@ void renderSprites(GameBoy* gameBoy) {
     }
 }
 
-Color getColor(GameBoy* gameBoy, uint16_t address, uint8_t colorNum) {
+Color getColor(GameBoy* gameBoy, const uint16_t address, const uint8_t colorNum) {
     Color res = WHITE;
     uint8_t palette = readFromMemory(gameBoy, address);
     int hi = 0;
@@ -526,7 +523,6 @@ int main() {
 
     gameBoy.scanlineCounter = SCANLINE_COUNTER_START;
     gameBoy.timerCounter = 1024;
-    //gameBoy.timerCounter = 0;
     gameBoy.dividerCounter = 0;
     gameBoy.romBanking = false;
     gameBoy.enableRAM = false;
@@ -609,6 +605,7 @@ int main() {
     // 59.727500569606 Hz = 59.727500569606 Frames per second
     // ~70224 cycles to 1 frame
     //uint32_t cyclesPerFrame = 4194304 / 59.727500569606;
+    // Time between frames = 16.7427062988 milliseconds
 
     // START TESTING SECTION
     /*
@@ -616,7 +613,6 @@ int main() {
     */
     bool willRunUntilPC = false;
     int pcToRunTo = 0x0;
-    bool previousCarry = gameBoy.cpu.carry;
 
     if(gameboyDebug()) {
         printCPU(&gameBoy.cpu);
@@ -662,12 +658,6 @@ int main() {
                         willRunUntilPC = false;
                         pcToRunTo = 0x0;
                     }
-                    if(previousCarry != gameBoy.cpu.carry) {
-                        printf("Carry Changed at PC:%x\n", gameBoy.cpu.pc - 1);
-                        printf("Old Carry Value = %d\n", previousCarry);
-                        printf("New Carry Value = %d\n", gameBoy.cpu.carry);
-                        previousCarry = gameBoy.cpu.carry;
-                    }
                 }
                 if(!willRunUntilPC) {
                     printCPU(&gameBoy.cpu);
@@ -709,8 +699,8 @@ int main() {
         SDL_RenderPresent(renderer);
         
         double elapsedTime = clock() - startTime;
-        if(elapsedTime <= TIME_BETWEEN_FRAMES) {
-            struct timespec remainingTime = { 0 , TIME_BETWEEN_FRAMES - elapsedTime };
+        if(elapsedTime <= TIME_BETWEEN_FRAMES_IN_NANOSECONDS) {
+            struct timespec remainingTime = { 0 , TIME_BETWEEN_FRAMES_IN_NANOSECONDS - elapsedTime };
             nanosleep(&remainingTime, NULL);
         }
     }
