@@ -86,6 +86,9 @@ uint8_t readFromMemory(GameBoy* gameBoy, const uint16_t address) {
     } else if((address >= 0xa000) && (address <= 0xbfff)) {
         uint16_t newAddress = address - 0xa000;
         return gameBoy->ramBanks[newAddress + (gameBoy->currentRAMBank * 0x2000)];
+    } else if((address >= 0xfea0) && (address < 0xff00)) {
+        // TODO OAM Corruption Bug
+        return 0xff;
     } else if(address == 0xff00) {
         return getGamepadState(gameBoy);
     } else
@@ -107,9 +110,10 @@ void writeToMemory(GameBoy* gameBoy, const uint16_t address, const uint8_t value
         if(address + 0x2000 <= 0xfdff)
             gameBoy->rom[address + 0x2000] = value;
     } else if((address >= 0xe000) && (address < 0xfe00)) {
+        // RESTRICTED
         gameBoy->rom[address] = value;
         gameBoy->rom[address - 0x2000] = value;
-    } else if(address == TMC) {
+    } else if(address == TAC) {
         uint8_t currentFreq = getClockFreq(gameBoy);
         gameBoy->rom[address] = value;
         uint8_t newFreq = getClockFreq(gameBoy);
@@ -140,17 +144,17 @@ void updateTimer(GameBoy* gameBoy, const int cycles) {
     }
 }
 
-bool isClockEnabled(GameBoy* gameBoy) { return bit_value(readFromMemory(gameBoy, TMC), 2) ? true : false; }
+bool isClockEnabled(GameBoy* gameBoy) { return bit_value(readFromMemory(gameBoy, TAC), 2) ? true : false; }
 
-uint8_t getClockFreq(GameBoy* gameBoy) { return readFromMemory(gameBoy, TMC) & 0x3; }
+uint8_t getClockFreq(GameBoy* gameBoy) { return readFromMemory(gameBoy, TAC) & 0x3; }
 
 void setClockFreq(GameBoy* gameBoy) {
     uint8_t freq = getClockFreq(gameBoy);
     switch(freq) {
-        case 0: gameBoy->timerCounter = 1024 ; break ; // freq 4096
-        case 1: gameBoy->timerCounter = 16 ; break ;// freq 262144
-        case 2: gameBoy->timerCounter = 64 ; break ;// freq 65536
-        case 3: gameBoy->timerCounter = 256 ; break ;// freq 16382
+        case 0: gameBoy->timerCounter = (CYCLES_PER_SECOND / 4096); break ; // freq 4096
+        case 1: gameBoy->timerCounter = (CYCLES_PER_SECOND / 262144); break ;// freq 262144
+        case 2: gameBoy->timerCounter = (CYCLES_PER_SECOND / 65536); break ;// freq 65536
+        case 3: gameBoy->timerCounter = (CYCLES_PER_SECOND / 16382); break ;// freq 16382
     }
 }
 
@@ -172,16 +176,23 @@ int doInterrupts(GameBoy* gameBoy) {
     uint8_t req = readFromMemory(gameBoy, 0xff0f);
     uint8_t enabled = readFromMemory(gameBoy, 0xffff);
     uint8_t potentialForInterrupts = req & enabled;
-    if(potentialForInterrupts == 0)
+    if(potentialForInterrupts == 0) {
+        if(gameBoy->eiHaltBug) gameBoy->eiHaltBug = false;
         return 0;
-    gameBoy->cpu.halted = false;
-    if(gameBoy->cpu.interruptsEnabled) {
-        if(req > 0)
-            for(int i = 0; i < 5; i++)
-                if(bit_value(req, i))
-                    if(bit_value(enabled, i))
-                        serviceInterrupt(gameBoy, i);
     }
+    if(gameBoy->cpu.interruptsEnabled || gameBoy->eiHaltBug) {
+        gameBoy->cpu.halted = false;
+        for(int i = 0; i < 5; i++)
+            if(bit_value(req, i) && bit_value(enabled, i)) {
+                serviceInterrupt(gameBoy, i);
+                return 20;
+            }
+        gameBoy->eiHaltBug = false;
+    } else if(gameBoy->cpu.halted) {
+        gameBoy->cpu.halted = false;
+        gameBoy->haltBug = true;
+    } else
+        gameBoy->cpu.halted = false;
     return 0;
 }
 
@@ -197,6 +208,7 @@ void serviceInterrupt(GameBoy* gameBoy, const int interrupt_id) {
         case 0: gameBoy->cpu.pc = 0x40; break;
         case 1: gameBoy->cpu.pc = 0x48; break;
         case 2: gameBoy->cpu.pc = 0x50; break;
+        case 3: gameBoy->cpu.pc = 0x58; break;
         case 4: gameBoy->cpu.pc = 0x60; break;
     }
 }
@@ -566,6 +578,7 @@ int main(int argc, char *argv[]) {
     gameBoy.mBC1 = false;
     gameBoy.mBC2 = false;
     gameBoy.haltBug = false;
+    gameBoy.eiHaltBug = false;
     gameBoy.gamepadState = 0xff;
     gameBoy.currentROMBank = 1;
     gameBoy.currentRAMBank = 0;
@@ -581,6 +594,7 @@ int main(int argc, char *argv[]) {
     cpu.halted = false;
     cpu.interruptsEnabled = false;
     cpu.pendingInterruptEnable = false;
+    cpu.oneInstructionPassed = false;
     cpu.pc = 0x0100;
     cpu.sp = 0xfffe;
     cpu.a = 0x01;

@@ -12,6 +12,7 @@ typedef struct CPU {
     bool halted;
     bool interruptsEnabled;
     bool pendingInterruptEnable;
+    bool oneInstructionPassed;
 } CPU;
 
 bool cpuDebug();

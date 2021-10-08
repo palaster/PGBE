@@ -1943,7 +1943,12 @@ void ret(GameBoy* gameBoy) {
     uint8_t lower = 0;
     uint8_t upper = 0;
     pop(gameBoy, &lower, &upper);
-    jp_from_bytes(gameBoy, lower, upper);
+    uint16_t pc = compose_bytes(lower, upper);
+    if(gameBoy->eiHaltBug) {
+        pc--;
+        gameBoy->eiHaltBug = false;
+    }
+    jp_from_word(gameBoy, pc);
 }
 
 void jp_from_word(GameBoy* gameBoy, const uint16_t address) { gameBoy->cpu.pc = address; }
@@ -1959,16 +1964,12 @@ void jp_from_pc(GameBoy* gameBoy) {
 void call(GameBoy* gameBoy) {
     uint8_t lowerNew = readFromMemory(gameBoy, gameBoy->cpu.pc++);
     uint8_t upperNew = readFromMemory(gameBoy, gameBoy->cpu.pc++);
-    uint8_t upperNext = (uint8_t) (gameBoy->cpu.pc >> 8);
-    uint8_t lowerNext = (uint8_t) (gameBoy->cpu.pc);
-    push(gameBoy, lowerNext, upperNext);
+    push(gameBoy, (uint8_t) (gameBoy->cpu.pc), (uint8_t) (gameBoy->cpu.pc >> 8));
     jp_from_bytes(gameBoy, lowerNew, upperNew);
 }
 
 void rst(GameBoy* gameBoy, const uint8_t value) {
-    uint8_t upper = (uint8_t) (gameBoy->cpu.pc >> 8);
-    uint8_t lower = (uint8_t) (gameBoy->cpu.pc);
-    push(gameBoy, lower, upper);
+    push(gameBoy, (uint8_t) (gameBoy->cpu.pc), (uint8_t) (gameBoy->cpu.pc >> 8));
     jp_from_word(gameBoy, 0x0000 + value);
 }
 
@@ -2088,6 +2089,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             /*
             gameBoy->cpu.halted = true;
             gameBoy->cpu.pc++;
+            gameBoy->rom[0xff04] = 0;
             */
             return instructionTimings[instruction];
         }
@@ -2766,6 +2768,8 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             // HALT
             if(cpuDebug()) printf("HALT\n");
             gameBoy->cpu.halted = true;
+            if(gameBoy->cpu.pendingInterruptEnable)
+                gameBoy->eiHaltBug = true;
             return instructionTimings[instruction];
         }
         case 0x77: {
@@ -3577,6 +3581,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             if(cpuDebug()) printf("DI\n");
             gameBoy->cpu.pendingInterruptEnable = false;
             gameBoy->cpu.interruptsEnabled = false;
+            gameBoy->cpu.oneInstructionPassed = false;
             return instructionTimings[instruction];
         }
         case 0xf4: {
@@ -3672,9 +3677,17 @@ int updateCPU(GameBoy* gameBoy) {
     if(cpuDebug()) printf("Instruction: %x\n", instruction);
     int cycles = decodeAndExecute(gameBoy, instruction);
     if(gameBoy->cpu.pendingInterruptEnable) {
-        if(!gameBoy->cpu.interruptsEnabled)
-            gameBoy->cpu.interruptsEnabled = true;
-        gameBoy->cpu.pendingInterruptEnable = false;
+        if(gameBoy->cpu.oneInstructionPassed) {
+            if(!gameBoy->cpu.interruptsEnabled)
+                gameBoy->cpu.interruptsEnabled = true;
+            gameBoy->cpu.pendingInterruptEnable = false;
+            gameBoy->cpu.oneInstructionPassed = false;
+        } else
+            gameBoy->cpu.oneInstructionPassed = true;
+    }
+    if(gameBoy->haltBug) {
+        gameBoy->cpu.pc--;
+        gameBoy->haltBug = false;
     }
     return cycles;
 }

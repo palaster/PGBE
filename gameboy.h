@@ -18,7 +18,7 @@
 
 #define TIMA 0xff05
 #define TMA 0xff06
-#define TMC 0xff07
+#define TAC 0xff07
 
 typedef enum Color {
     WHITE,
@@ -36,6 +36,7 @@ typedef struct GameBoy {
     bool mBC1;
     bool mBC2;
     bool haltBug;
+    bool eiHaltBug;
     CPU cpu;
     uint8_t gamepadState;
     uint8_t currentROMBank;
