@@ -4,7 +4,7 @@
 #include "gameboy.h"
 
 const uint8_t instructionTimings[256] = {
-	1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
+    1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
     1,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
     2,3,2,2,1,1,2,1,2,2,2,2,1,1,2,1,
     2,3,2,2,3,3,3,1,2,2,2,2,1,1,2,1,
@@ -2766,14 +2766,6 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
             // HALT
             if(cpuDebug()) printf("HALT\n");
             gameBoy->cpu.halted = true;
-            /*
-            if(gameBoy->cpu.interruptsEnabled)
-                gameBoy->cpu.halted = true;
-            else if((readFromMemory(gameBoy, 0xffff) & readFromMemory(gameBoy, 0xff0f)) == 0)
-                gameBoy->cpu.halted = true;
-            else
-                gameBoy->haltBug = true;
-            */
             return instructionTimings[instruction];
         }
         case 0x77: {

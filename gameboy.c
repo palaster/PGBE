@@ -171,14 +171,10 @@ void requestInterrupt(GameBoy* gameBoy, const int interrupt_id) {
 int doInterrupts(GameBoy* gameBoy) {
     uint8_t req = readFromMemory(gameBoy, 0xff0f);
     uint8_t enabled = readFromMemory(gameBoy, 0xffff);
-    /*
     uint8_t potentialForInterrupts = req & enabled;
     if(potentialForInterrupts == 0)
         return 0;
-    else
-        gameBoy->cpu.halted = false;
     gameBoy->cpu.halted = false;
-    */
     if(gameBoy->cpu.interruptsEnabled) {
         if(req > 0)
             for(int i = 0; i < 5; i++)
