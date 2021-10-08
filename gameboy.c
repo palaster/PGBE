@@ -371,6 +371,8 @@ void renderTiles(GameBoy* gameBoy) {
         if((finally < 0) || (finally > 143) || (pixel < 0) || (pixel > 159))
             continue;
 
+        gameBoy->scanlineBG[pixel] = (col == 0);
+
         gameBoy->screenData[pixel][finally][0] = red;
         gameBoy->screenData[pixel][finally][1] = green;
         gameBoy->screenData[pixel][finally][2] = blue;
@@ -391,7 +393,7 @@ void renderSprites(GameBoy* gameBoy) {
 
         bool yFlip = bit_value(attributes, 6);
         bool xFlip = bit_value(attributes, 5);
-        //bool priority = !bit_value(attributes, 7);
+        bool priority = !bit_value(attributes, 7);
         int scanline = readFromMemory(gameBoy, 0xff44);
 
         int ySize = use8x16 ? 16 : 8;
@@ -442,14 +444,11 @@ void renderSprites(GameBoy* gameBoy) {
                 if((scanline < 0) || (scanline > 143) || (pixel < 0) || (pixel > 159))
                     continue;
 
-                /*
-                if(!priority)
-                    continue;
-                */
-
-                gameBoy->screenData[pixel][scanline][0] = red;
-                gameBoy->screenData[pixel][scanline][1] = green;
-                gameBoy->screenData[pixel][scanline][2] = blue;
+                if(gameBoy->scanlineBG[pixel] || priority) {
+                    gameBoy->screenData[pixel][scanline][0] = red;
+                    gameBoy->screenData[pixel][scanline][1] = green;
+                    gameBoy->screenData[pixel][scanline][2] = blue;
+                }
             }
         }
     }
@@ -536,7 +535,7 @@ int main(int argc, char *argv[]) {
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         WIDTH, HEIGHT,
-        0
+        SDL_WINDOW_RESIZABLE
     );
 
     if(!screen) {
@@ -549,14 +548,13 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Could not create renderer\n");
         return 1;
     }
-    /*
+
     SDL_Texture* texture = SDL_CreateTexture(
         renderer,
-        SDL_PIXELFORMAT_ARGB8888,
+        SDL_PIXELFORMAT_RGB24,
         SDL_TEXTUREACCESS_STREAMING,
         WIDTH, HEIGHT
     );
-    */
 
     GameBoy gameBoy;
 
@@ -576,6 +574,7 @@ int main(int argc, char *argv[]) {
     memset(gameBoy.cartridge, 0, sizeof(gameBoy.cartridge));
     memset(gameBoy.rom, 0, sizeof(gameBoy.rom));
     memset(gameBoy.screenData, 0, sizeof(gameBoy.screenData));
+    memset(gameBoy.scanlineBG, 0, sizeof(gameBoy.scanlineBG));
     
     CPU cpu;
 
@@ -753,24 +752,16 @@ int main(int argc, char *argv[]) {
             cyclesThisFrame += doInterrupts(&gameBoy);
         }
 
-        /*
-        for(int x = 0; x < WIDTH; x++)
-            for(int y = 0; y < HEIGHT; y++)
-                printf("%u - %u - %u\n", gameBoy.screenData[x][y][0], gameBoy.screenData[x][y][1], gameBoy.screenData[x][y][2]);
-        */
-
+        uint8_t pixels[WIDTH * HEIGHT * 3];
         for(int x = 0; x < WIDTH; x++)
             for(int y = 0; y < HEIGHT; y++) {
-                SDL_SetRenderDrawColor(renderer, gameBoy.screenData[x][y][0], gameBoy.screenData[x][y][1], gameBoy.screenData[x][y][2], 255);
-                SDL_RenderDrawPoint(renderer, x, y);
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0);
+                pixels[(y * WIDTH * 3) + (x * 3)] = gameBoy.screenData[x][y][0];
+                pixels[(y * WIDTH * 3) + (x * 3) + 1] = gameBoy.screenData[x][y][1];
+                pixels[(y * WIDTH * 3) + (x * 3) + 2] = gameBoy.screenData[x][y][2];
             }
-        
-        /*
-        SDL_UpdateTexture(texture, NULL, gameBoy.screenData, WIDTH * sizeof(uint8_t) * 3);
+        SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint8_t) * 3);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
-        */
         SDL_RenderPresent(renderer);
         
         double elapsedTime = clock() - startTime;
@@ -780,7 +771,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //SDL_DestroyTexture(texture);
+    SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(screen);
     SDL_Quit();
