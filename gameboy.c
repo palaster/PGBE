@@ -385,9 +385,9 @@ void renderTiles(GameBoy* gameBoy) {
 
         gameBoy->scanlineBG[pixel] = (col == 0);
 
-        gameBoy->screenData[pixel][finally][0] = red;
-        gameBoy->screenData[pixel][finally][1] = green;
-        gameBoy->screenData[pixel][finally][2] = blue;
+        gameBoy->screenData[(finally * WIDTH * 3) + (pixel * 3)] = red;
+        gameBoy->screenData[(finally * WIDTH * 3) + (pixel * 3) + 1] = green;
+        gameBoy->screenData[(finally * WIDTH * 3) + (pixel * 3) + 2] = blue;
     }
 }
 
@@ -457,9 +457,9 @@ void renderSprites(GameBoy* gameBoy) {
                     continue;
 
                 if(gameBoy->scanlineBG[pixel] || priority) {
-                    gameBoy->screenData[pixel][scanline][0] = red;
-                    gameBoy->screenData[pixel][scanline][1] = green;
-                    gameBoy->screenData[pixel][scanline][2] = blue;
+                    gameBoy->screenData[(scanline * WIDTH * 3) + (pixel * 3)] = red;
+                    gameBoy->screenData[(scanline * WIDTH * 3) + (pixel * 3) + 1] = green;
+                    gameBoy->screenData[(scanline * WIDTH * 3) + (pixel * 3) + 2] = blue;
                 }
             }
         }
@@ -543,7 +543,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Window* screen = SDL_CreateWindow("AnotherGBEmu",
+    SDL_Window* screen = SDL_CreateWindow("PGBE",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         WIDTH, HEIGHT,
@@ -766,14 +766,7 @@ int main(int argc, char *argv[]) {
             cyclesThisFrame += doInterrupts(&gameBoy);
         }
 
-        uint8_t pixels[WIDTH * HEIGHT * 3];
-        for(int x = 0; x < WIDTH; x++)
-            for(int y = 0; y < HEIGHT; y++) {
-                pixels[(y * WIDTH * 3) + (x * 3)] = gameBoy.screenData[x][y][0];
-                pixels[(y * WIDTH * 3) + (x * 3) + 1] = gameBoy.screenData[x][y][1];
-                pixels[(y * WIDTH * 3) + (x * 3) + 2] = gameBoy.screenData[x][y][2];
-            }
-        SDL_UpdateTexture(texture, NULL, pixels, WIDTH * sizeof(uint8_t) * 3);
+        SDL_UpdateTexture(texture, NULL, gameBoy.screenData, WIDTH * sizeof(uint8_t) * 3);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);

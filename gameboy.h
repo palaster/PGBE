@@ -44,7 +44,7 @@ typedef struct GameBoy {
     uint8_t ramBanks[0x8000];
     uint8_t cartridge[0x200000];
     uint8_t rom[0x10000];
-    uint8_t screenData[WIDTH][HEIGHT][3];
+    uint8_t screenData[WIDTH * HEIGHT * 3];
     bool scanlineBG[WIDTH];
 } GameBoy;
 

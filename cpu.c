@@ -62,8 +62,6 @@ const uint8_t cbInstructionTimings[256] = {
 
 bool cpuDebug() { return false; }
 
-uint8_t fetch(GameBoy* gameBoy) { return readFromMemory(gameBoy, gameBoy->cpu.pc++); }
-
 void pop(GameBoy* gameBoy, uint8_t* lower, uint8_t* upper) {
     *lower = readFromMemory(gameBoy, gameBoy->cpu.sp++);
     *upper = readFromMemory(gameBoy, gameBoy->cpu.sp++);
@@ -3673,7 +3671,7 @@ int decodeAndExecute(GameBoy* gameBoy, const uint8_t instruction) {
 }
 
 int updateCPU(GameBoy* gameBoy) {
-    uint8_t instruction = fetch(gameBoy);
+    uint8_t instruction = readFromMemory(gameBoy, gameBoy->cpu.pc++);
     if(cpuDebug()) printf("Instruction: %x\n", instruction);
     int cycles = decodeAndExecute(gameBoy, instruction);
     if(gameBoy->cpu.pendingInterruptEnable) {

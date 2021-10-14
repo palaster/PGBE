@@ -6,8 +6,8 @@
 // FIRST METHOD byte, bitPosition = byte & (1 << bitPosition)
 // SECOND METHOD byte, bitPosition = (byte >> bitposition) & 1
 
-static bool check_bit(const uint8_t byte, const uint8_t position) { return (byte & (1 << position)) != 0; } // (aka GetVal if following codeslinger tutorial)
-static uint8_t bit_value(const uint8_t byte, const uint8_t position) { return (byte >> position) & 1; } // (aka TestBit if following codeslinger tutorial)
+static bool check_bit(const uint8_t byte, const uint8_t position) { return (byte & (1 << position)) != 0; } // (aka GetVal if using codeslinger)
+static uint8_t bit_value(const uint8_t byte, const uint8_t position) { return (byte >> position) & 1; } // (aka TestBit if using codeslinger)
 static uint8_t set_bit(const uint8_t byte, const uint8_t position) { return byte | (1 << position); }
 static uint8_t reset_bit(const uint8_t byte, const uint8_t position) { return byte & (~(1 << position)); }
 static uint8_t set_bit_to(const uint8_t byte, const uint8_t position, const bool on) { return on ? set_bit(byte, position) : reset_bit(byte, position); }

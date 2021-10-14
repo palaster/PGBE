@@ -17,8 +17,6 @@ typedef struct CPU {
 
 bool cpuDebug();
 
-uint8_t fetch(GameBoy* gameBoy);
-
 void pop(GameBoy* gameBoy, uint8_t* lower, uint8_t* upper);
 void push(GameBoy* gameBoy, const uint8_t lower, const uint8_t upper);
 
